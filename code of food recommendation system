@@ -1,0 +1,42 @@
+import pandas as pd
+import numpy as np
+from scipy.sparse import csr_matrix
+from sklearn.neighbors import NearestNeighbors
+
+# Load datasets
+food = pd.read_csv("/content/food.csv")
+ratings = pd.read_csv("/content/Recipe Reviews and User Feedback Dataset.csv")
+
+# Prepare the ratings matrix
+dataset = ratings.pivot_table(index='recipe_name', columns='user_name', values='user_reputation')
+dataset.fillna(0, inplace=True)
+
+# Create a sparse matrix and train the NearestNeighbors model
+csr_dataset = csr_matrix(dataset.values)
+dataset.reset_index(inplace=True)
+
+model = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=20, n_jobs=-1)
+model.fit(csr_dataset)
+
+# Recommendation function
+def food_recommendation(Food_Name):
+    n = 10
+    FoodList = food[food['Description'].str.contains(Food_Name, case=False, na=False)]
+    if len(FoodList):
+        Food1 = FoodList.iloc[0]['Description']
+        Food1_index = dataset[dataset['recipe_name'] == Food1].index[0]
+        distances, indices = model.kneighbors(csr_dataset[Food1_index], n_neighbors=n+1)
+
+        # Collect recommendations
+        Recommendations = []
+        for val in indices.squeeze().tolist()[1:]:  # Skip the first result (self)
+            recipe_name = dataset.iloc[val]['recipe_name']
+            Recommendations.append(recipe_name)
+
+        return Recommendations
+    else:
+        return "No Similar Foods."
+
+# Example usage
+recommendations = food_recommendation('chicken tikka')
+print(recommendations)
